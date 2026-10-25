@@ -1,150 +1,105 @@
+import pygame
+from pygame.locals import *
 from OpenGL.GL import *
-from OpenGL.GLUT import *
 from OpenGL.GLU import *
-import math
-
-# Initialize variables
-Q = gluNewQuadric()
-angle = 0
 
 
-# Draw a cylindrical rod between two points
-def bar(a, b, r=0.06):
-    dx = b[0] - a[0]
-    dy = b[1] - a[1]
-    dz = b[2] - a[2]
-
-    L = math.sqrt(dx * dx + dy * dy + dz * dz)
-
-    if L == 0:
-        return
-
+def cube(x, y, z, sx, sy, sz, color):
     glPushMatrix()
-    glTranslatef(*a)
+    glTranslatef(x, y, z)
+    glScalef(sx, sy, sz)
+    glColor3fv(color)
 
-    # Align the cylinder's Z-axis with the rod direction
-    if abs(dx) > 1e-8 or abs(dy) > 1e-8:
-        angle_deg = math.degrees(math.acos(max(-1.0, min(1.0, dz / L))))
-        glRotatef(angle_deg, -dy, dx, 0)
-    elif dz < 0:
-        glRotatef(180, 1, 0, 0)
+    vertices = [
+        (-1,-1,-1), (1,-1,-1), (1,1,-1), (-1,1,-1),
+        (-1,-1, 1), (1,-1, 1), (1,1, 1), (-1,1, 1)
+    ]
 
-    gluCylinder(Q, r, r, L, 12, 1)
+    faces = [
+        (0,1,2,3), (4,5,6,7), (0,1,5,4),
+        (2,3,7,6), (1,2,6,5), (0,3,7,4)
+    ]
+
+    glBegin(GL_QUADS)
+    for face in faces:
+        for v in face:
+            glVertex3fv(vertices[v])
+    glEnd()
     glPopMatrix()
 
 
-# Draw a wheel with a tyre and six spokes
-def wheel(x):
+def wheel(x, z):
     glPushMatrix()
-    glTranslatef(x, 0, 0)
-    glRotatef(angle, 0, 0, 1)
+    glTranslatef(x, -0.55, z)
+    glRotatef(90, 0, 1, 0)
+    glColor3f(0.08, 0.08, 0.08)
 
-    # Tyre
-    glColor3f(0.1, 0.1, 0.1)
-    glutSolidTorus(0.1, 1.0, 12, 24)
+    q = gluNewQuadric()
+    gluCylinder(q, 0.38, 0.38, 0.18, 20, 1)
+    gluDisk(q, 0, 0.38, 20, 1)
 
-    # Spokes
-    glColor3f(0.7, 0.7, 0.7)
-
-    for i in range(6):
-        a = i * math.pi / 6
-        c = math.cos(a)
-        s = math.sin(a)
-
-        bar((-c, -s, 0), (c, s, 0), 0.02)
+    glTranslatef(0, 0, 0.18)
+    gluDisk(q, 0, 0.38, 20, 1)
+    gluDeleteQuadric(q)
 
     glPopMatrix()
 
 
-# Draw the complete bicycle
-def draw_bicycle():
+def car():
+    # Main body
+    cube(0, 0, 0, 2, 0.45, 0.8, (0.9, 0.05, 0.05))
 
-    # Wheels
-    wheel(-1.2)
-    wheel(1.2)
+    # Roof
+    cube(-0.2, 0.75, 0, 1.1, 0.4, 0.65,
+         (0.1, 0.3, 0.9))
 
-    # Green frame
-    glColor3f(0.0, 0.5, 0.0)
+    # Windows
+    cube(-0.2, 0.78, 0.66, 0.85, 0.25, 0.03,
+         (0.3, 0.9, 1.0))
 
-    bar((-1.2, 0, 0), (0, 1, 0))
-    bar((0, 1, 0), (1.2, 0, 0))
-    bar((-1.2, 0, 0), (1.2, 0, 0))
+    # Four wheels
+    for x in [-1.25, 1.25]:
+        for z in [-0.65, 0.65]:
+            wheel(x, z)
 
-    # Seat support and seat
-    bar((0, 1, 0), (0, 1.4, 0))
-    bar((-0.25, 1.4, 0), (0.25, 1.4, 0), 0.08)
-
-    # Handle support and handlebar
-    bar((1.2, 0, 0), (1.2, 0.8, 0))
-    bar((1.2, 0.8, 0), (1.5, 0.8, 0))
-
-    # Pedal crank and pedal
-    glColor3f(0.8, 0.2, 0.0)
-
-    bar((0, 1, 0), (0, 0.6, 0), 0.04)
-    bar((-0.25, 0.6, 0), (0.25, 0.6, 0), 0.04)
+    # Headlights
+    cube(2.03, 0.05, -0.45, 0.08, 0.15, 0.18,
+         (1.0, 1.0, 0.1))
+    cube(2.03, 0.05, 0.45, 0.08, 0.15, 0.18,
+         (1.0, 1.0, 0.1))
 
 
-# Display and animate the bicycle
-def display():
-    global angle
+pygame.init()
+display = (800, 600)
+
+pygame.display.set_mode(display, DOUBLEBUF | OPENGL)
+pygame.display.set_caption("Simple 3D Toy Car")
+
+glEnable(GL_DEPTH_TEST)
+glClearColor(0.75, 0.85, 0.95, 1)
+
+glMatrixMode(GL_PROJECTION)
+gluPerspective(45, display[0] / display[1], 0.1, 50)
+
+glMatrixMode(GL_MODELVIEW)
+glLoadIdentity()
+gluLookAt(6, 4, 7, 0, 0, 0, 0, 1, 0)
+
+clock = pygame.time.Clock()
+running = True
+
+while running:
+    for event in pygame.event.get():
+        if event.type == QUIT or (
+            event.type == KEYDOWN and event.key == K_ESCAPE
+        ):
+            running = False
 
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
 
-    glMatrixMode(GL_MODELVIEW)
-    glLoadIdentity()
+    car()  # Draw car without rotation
 
-    # Set the camera
-    gluLookAt(
-        0, 0, 7,
-        0, 0, 0,
-        0, 1, 0
-    )
+    pygame.display.flip()
+    clock.tick(60)
 
-    # Draw bicycle
-    draw_bicycle()
-
-    # Display the frame
-    glutSwapBuffers()
-
-    # Rotate the wheels
-    angle = (angle + 2) % 360
-
-
-# Initialize OpenGL settings
-def init():
-    glClearColor(1, 1, 1, 1)
-
-    glEnable(GL_DEPTH_TEST)
-
-    glMatrixMode(GL_PROJECTION)
-    glLoadIdentity()
-
-    gluPerspective(45, 800 / 600, 1, 20)
-
-    glMatrixMode(GL_MODELVIEW)
-
-
-# Main function
-def main():
-    glutInit()
-
-    glutInitDisplayMode(
-        GLUT_DOUBLE | GLUT_RGB | GLUT_DEPTH
-    )
-
-    glutInitWindowSize(800, 600)
-    glutInitWindowPosition(100, 100)
-
-    glutCreateWindow(b"OpenGL Bicycle")
-
-    init()
-
-    glutDisplayFunc(display)
-    glutIdleFunc(display)
-
-    glutMainLoop()
-
-
-# Run the program
-main()
+pygame.quit()
